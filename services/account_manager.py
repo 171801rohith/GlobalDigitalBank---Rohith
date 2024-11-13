@@ -1,56 +1,48 @@
-# Open Account
-# Close account
-# Withdrawal
-# Deposit
-# Check is account is active
-# transfer
-# Validate pin number
-# Close account
-
 from models.savings import Savings
 from models.current import Current
 from repositories.account_repository import AccountRepository
-from exceptions.exception import *
+from exceptions.exceptions import AccountNotActiveException
+from exceptions.exceptions import InsufficientFundsException
+from exceptions.exceptions import InvalidPinException
+from exceptions.exceptions import TransferLimitExceededException
 from services.transaction_manager import TransactionManager
 from services.account_privileges_manager import AccountPrivilegesManager
 
-
 class AccountManager:
-    # kwargs = keyword arguements (U can pass more arguments than mentioned in declaration)
     def open_account(self, account_type, **kwargs):
-        if account_type == "savings":
+        if account_type == 'savings':
             new_account = Savings(**kwargs)
-
-        elif account_type == "current":
+        elif account_type == 'current':
             new_account = Current(**kwargs)
         else:
-            raise ValueError("Invalid Account Type")
+            raise ValueError('Invalid account type')
 
         AccountRepository.save_account(new_account)
         return new_account
 
     def check_account_active(self, account):
         if not account.is_active:
-            raise AccountNotActiveException("Account is not  active")
+            raise AccountNotActiveException('Account is not Active')
 
     def validate_pin(self, account, pin_number):
         if account.pin_number != pin_number:
-            raise InvalidPinException("invalid Pin Number")
+            raise InvalidPinException('Invalid Pin')
 
     def withdraw(self, account, amount, pin_number):
         self.check_account_active(account)
         self.validate_pin(account, pin_number)
 
-        if amount.balance < amount:
-            raise InsufficientFundsException("insufficient funds")
+        if account.balance < amount:
+            raise InsufficientFundsException('Insufficient funds')
 
-        amount -= amount.balance
-        TransactionManager.log_transaction(account.account_number, amount, "Withdraw")
+        account.balance -= amount
+        TransactionManager.log_transaction(account.account_number, amount, 'withdraw')
 
-    def deposit(self, account, amount):
+    def deposit(self,account, amount):
         self.check_account_active(account)
-        account.balance += amount.balance
-        TransactionManager.log_transaction(account.account_number, amount, "Deposit")
+
+        account.balance += amount
+        TransactionManager.log_transaction(account.account_number, amount, 'deposit')
 
     def transfer(self, from_account, to_account, amount, pin_number):
         self.check_account_active(from_account)
@@ -58,20 +50,19 @@ class AccountManager:
         self.validate_pin(from_account, pin_number)
 
         if from_account.balance < amount:
-            raise InsufficientFundsException("insufficient funds")
+            raise InsufficientFundsException('Insufficient funds')
 
-        limit = AccountPrivilegesManager.get_limit(from_account.privilege)
-
+        limit = AccountPrivilegesManager.get_transfer_limit(from_account.privilege)
         if amount > limit:
-            raise TransferLimitExceededException("Transaction Limit Exceeded")
+            raise TransferLimitExceededException('Transfer limit exceeded')
 
         from_account.balance -= amount
         to_account.balance += amount
-        TransactionManager.log_transaction(
-            from_account.account_number, amount, "Transfer", to_account.account_number
-        )
+        TransactionManager.log_transaction(from_account.account_number, amount, 'transfer', to_account.account_number)
 
 
-    def close_account(self,account):
+    def close_account(self, account):
         if not account.is_active:
             raise AccountNotActiveException('Account is already Deactivated')
+        
+
